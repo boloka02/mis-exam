@@ -12,15 +12,50 @@ export default function PhaseFourExam() {
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [countdown, setCountdown] = useState(300); // 5 minutes
+  const [countdown, setCountdown] = useState(300); // 5 minutes in seconds
 
-  // Timer
+  // Initialize timer from localStorage
   useEffect(() => {
-    if (countdown > 0 && !isSubmitted) {
-      const timer = setTimeout(() => setCountdown(countdown - 1), 1000);
-      return () => clearTimeout(timer);
+    if (isSubmitted) return;
+
+    const examKey = `examTimer_${examId}`;
+    const storedStartTime = localStorage.getItem(examKey);
+
+    let initialCountdown = 300; // Default 5 minutes
+    if (storedStartTime) {
+      const startTime = parseInt(storedStartTime, 10);
+      const elapsed = Math.floor((Date.now() - startTime) / 1000);
+      initialCountdown = Math.max(300 - elapsed, 0);
+    } else {
+      // Store the start time if it doesn't exist
+      localStorage.setItem(examKey, Date.now().toString());
     }
-  }, [countdown, isSubmitted]);
+
+    setCountdown(initialCountdown);
+  }, [examId, isSubmitted]);
+
+  // Timer logic
+  useEffect(() => {
+    if (countdown <= 0 || isSubmitted) {
+      if (countdown <= 0) {
+        setCountdown(0); // Ensure it doesn't go negative
+      }
+      return;
+    }
+
+    const timer = setInterval(() => {
+      const examKey = `examTimer_${examId}`;
+      const storedStartTime = localStorage.getItem(examKey);
+      if (storedStartTime) {
+        const startTime = parseInt(storedStartTime, 10);
+        const elapsed = Math.floor((Date.now() - startTime) / 1000);
+        const remaining = Math.max(300 - elapsed, 0);
+        setCountdown(remaining);
+      }
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [countdown, isSubmitted, examId]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0] || null;
@@ -70,6 +105,8 @@ export default function PhaseFourExam() {
 
       if (result.success) {
         setIsSubmitted(true);
+        // Clear timer from localStorage on successful submission
+        localStorage.removeItem(`examTimer_${examId}`);
       } else {
         setError(result.error || 'Failed to submit file.');
       }

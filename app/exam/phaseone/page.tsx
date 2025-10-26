@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useSearchParams } from 'next/navigation';
@@ -19,15 +18,45 @@ export default function PhaseOneExam() {
   });
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [countdown, setCountdown] = useState(300); // 5 minutes
+  const [countdown, setCountdown] = useState(300); // 5 minutes in seconds
 
-  // Timer
+  // Initialize timer
   useEffect(() => {
-    if (countdown > 0 && !isSubmitted) {
-      const timer = setTimeout(() => setCountdown(countdown - 1), 1000);
-      return () => clearTimeout(timer);
+    if (isSubmitted) return;
+
+    const EXAM_DURATION = 300; // 5 minutes in seconds
+    const startTimeKey = `examStartTime_${examId}`;
+
+    // Get start time from localStorage or set a new one
+    const storedStartTime = localStorage.getItem(startTimeKey);
+    let startTime: number;
+
+    if (storedStartTime) {
+      startTime = parseInt(storedStartTime, 10);
+    } else {
+      startTime = Date.now();
+      localStorage.setItem(startTimeKey, startTime.toString());
     }
-  }, [countdown, isSubmitted]);
+
+    // Calculate initial countdown
+    const elapsedSeconds = Math.floor((Date.now() - startTime) / 1000);
+    const remainingSeconds = Math.max(EXAM_DURATION - elapsedSeconds, 0);
+    setCountdown(remainingSeconds);
+
+    // Timer logic
+    const timer = setInterval(() => {
+      const elapsed = Math.floor((Date.now() - startTime) / 1000);
+      const remaining = Math.max(EXAM_DURATION - elapsed, 0);
+      setCountdown(remaining);
+
+      if (remaining <= 0) {
+        clearInterval(timer);
+        // Optionally, auto-submit or disable form here
+      }
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [isSubmitted, examId]);
 
   const questions = [
     {
@@ -76,6 +105,8 @@ export default function PhaseOneExam() {
     await submitPhaseOneExam(examId || '', answers);
     setLoading(false);
     setIsSubmitted(true);
+    // Clear timer data from localStorage on submission
+    localStorage.removeItem(`examStartTime_${examId}`);
   };
 
   const formatTime = (seconds: number): string => {
@@ -173,6 +204,7 @@ export default function PhaseOneExam() {
                         onChange={() => handleAnswerChange(question.id, option)}
                         className="mr-3 h-4 w-4 text-blue-500"
                         required
+                        disabled={countdown === 0}
                       />
                       <span className="text-sm text-gray-800">{option}</span>
                     </label>
